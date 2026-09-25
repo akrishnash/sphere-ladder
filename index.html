@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive explorers for the circle, sphere, torus, 3-sphere and 4-sphere: flows, stereographic shadows and the Hopf fibration.">
+<meta property="og:title" content="Sphere Ladder">
+<meta property="og:description" content="S¹ → S² → torus → S³ → S⁴, one dimension at a time. Hopf fibration, stereographic projection and slicing, all interactive.">
+<title>Sphere Ladder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400;1,6..72,500&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #eef0f5;
+    --panel: #ffffff;
+    --line: rgba(40, 50, 90, 0.14);
+    --line-strong: rgba(40, 50, 90, 0.32);
+    --ink: #151826;
+    --muted: #5d6479;
+    --body: #2d3245;
+    --focus: #1f6fd1;
+    --accent: #1f6fd1;
+    --pressed: rgba(31, 111, 209, 0.1);
+    --glass: rgba(255, 255, 255, 0.86);
+    --warm: #b8600c;
+    --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #06070c; --panel: #0c0e16;
+      --line: rgba(160, 170, 210, 0.16); --line-strong: rgba(160, 170, 210, 0.32);
+      --ink: #e7e9f2; --muted: #8b91a8; --body: #c9cddc;
+      --focus: #9fd0ff; --accent: #6fb7ff; --pressed: rgba(111, 183, 255, 0.1);
+      --glass: rgba(6, 7, 12, 0.72); --warm: #ffb86b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #06070c; --panel: #0c0e16;
+    --line: rgba(160, 170, 210, 0.16); --line-strong: rgba(160, 170, 210, 0.32);
+    --ink: #e7e9f2; --muted: #8b91a8; --body: #c9cddc;
+    --focus: #9fd0ff; --accent: #6fb7ff; --pressed: rgba(111, 183, 255, 0.1);
+    --glass: rgba(6, 7, 12, 0.72); --warm: #ffb86b;
+  }
+  [hidden] { display: none !important; }
+  .home-head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; justify-content: space-between; }
+  .bar-right { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 13px/1.55 var(--mono); }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 28px 16px 40px; display: flex; flex-direction: column; gap: 20px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .label { text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; color: var(--muted); }
+  .f { font-family: var(--mono); font-size: 0.86em; color: var(--ink); white-space: nowrap; }
+
+  /* ── Home ── */
+  h1 { margin: 0 0 6px; font: italic 500 38px/1.05 var(--serif); letter-spacing: -0.01em; text-wrap: balance; }
+  .lede { margin: 0; color: var(--muted); max-width: 72ch; font: 17px/1.5 var(--serif); }
+  .lede b, .prose b, .pattern b { color: var(--ink); font-weight: 400; font-style: italic; }
+  .ladder { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .card {
+    display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    overflow: hidden; color: inherit; text-decoration: none;
+    transition: border-color .2s, transform .2s;
+  }
+  .card:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .card-head { padding: 14px 16px 0; display: flex; flex-direction: column; gap: 2px; }
+  .card-head .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  h2 { margin: 0; font: italic 400 25px/1.1 var(--serif); }
+  .sym { font: 500 14px var(--mono); color: var(--muted); margin-left: 6px; font-style: normal; }
+  .meta { color: var(--muted); font-size: 11px; }
+  .meta b { color: var(--ink); font-weight: 500; }
+  .card canvas { display: block; width: 100%; height: 300px; pointer-events: none; }
+  .card-foot { padding: 0 16px 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card-foot p { margin: 0; color: var(--muted); font: 14px/1.45 var(--serif); }
+  .open { color: var(--accent); font-size: 11px; white-space: nowrap; }
+  .pattern { border-top: 1px solid var(--line); padding-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; }
+  .pattern p { margin: 0; color: var(--muted); font: 15px/1.5 var(--serif); }
+  .note { color: var(--muted); font-size: 11px; }
+
+  /* ── Detail ── */
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .steps { display: flex; gap: 4px; flex-wrap: wrap; }
+  button, .btn {
+    font: inherit; font-size: 12px; color: var(--muted); background: transparent;
+    border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; text-decoration: none;
+  }
+  button:hover, .btn:hover { color: var(--ink); border-color: var(--line-strong); }
+  button[aria-pressed="true"], .steps .btn[aria-current="page"] { color: var(--ink); border-color: rgba(159, 208, 255, 0.5); background: var(--pressed); }
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; align-items: start; }
+  .viewport { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .viewport canvas { display: block; width: 100%; height: clamp(380px, 78vh, 820px); cursor: grab; touch-action: none; }
+  .viewport canvas:active { cursor: grabbing; }
+  .viewport canvas.flat { cursor: default; touch-action: pan-y; }
+  .readout {
+    position: absolute; top: 12px; left: 12px; pointer-events: none;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 10px; font-size: 11.5px; line-height: 1.6; font-variant-numeric: tabular-nums;
+    display: grid; grid-template-columns: auto auto; gap: 0 14px;
+  }
+  .readout span:nth-child(odd) { color: var(--muted); }
+  .hint { position: absolute; right: 12px; bottom: 10px; color: var(--muted); font-size: 11px; pointer-events: none; }
+  .side { display: flex; flex-direction: column; gap: 14px; max-height: clamp(380px, 78vh, 820px); overflow-y: auto; padding-right: 4px; }
+  .side-head { display: flex; flex-direction: column; gap: 3px; }
+  .side-head h2 { font-size: 32px; }
+  .eq { font-size: 12px; }
+  .controls { display: flex; flex-direction: column; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field .top { display: flex; justify-content: space-between; gap: 8px; }
+  .field output { font-size: 11px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+  .prose { display: flex; flex-direction: column; gap: 14px; }
+  .prose h3 { margin: 0 0 3px; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); }
+  .prose p { margin: 0; font: 15.5px/1.55 var(--serif); color: var(--body); }
+  .prose table { border-collapse: collapse; width: 100%; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .prose td, .prose th { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+  .prose th { color: var(--muted); font-weight: 400; }
+  .prose td.peak { color: var(--warm); }
+
+  @media (max-width: 980px) {
+    .stage { grid-template-columns: 1fr; }
+    .side { max-height: none; overflow: visible; }
+    .viewport canvas { height: clamp(340px, 62vh, 620px); }
+  }
+  @media (max-width: 560px) { h1 { font-size: 28px; } .card canvas { height: 260px; } }
+  @media (prefers-reduced-motion: reduce) { .card, .card:hover { transition: none; transform: none; } }
+</style>
+</head>
+<body>
+
+<div id="home" class="wrap">
+  <header class="home-head">
+    <div>
+    <h1>Climbing the sphere ladder</h1>
+    <p class="lede">Each sphere is one dimension higher than the last. At every step the same trick lets us see it: shine a light from the <b>north pole N</b> and look at the shadow it casts on flat space one dimension down. The torus is the bridge between S² and S³. Pick a card to open it full size.</p>
+    </div>
+    <button type="button" class="theme-btn" id="themeHome">Theme: System</button>
+  </header>
+  <section class="ladder" id="cards"></section>
+  <section class="pattern">
+    <p><b>The sphere is always one dimension less than its home.</b> S¹ is a curve in the plane, S² a surface in space, and S³ a 3-D "space" that needs four axes to sit in.</p>
+    <p><b>The shadow is flat space plus one missing point.</b> A line, a plane, ordinary space: N is the one point with no shadow, and it goes to infinity.</p>
+    <p><b>Odd spheres can flow everywhere; even ones can't.</b> S¹ and S³ carry flows with no still point. S² and S⁴ always have one, like the poles of a spinning globe.</p>
+  </section>
+  <p class="note">A <a href="https://github.com/akrishnash/sphere-ladder" style="color:var(--accent)">Python companion</a> (<span class="f">python -m sphere_ladder verify</span>) checks the claims on these pages numerically with NumPy. · <a href="https://akrishnash.github.io/" style="color:var(--accent)">akrishnash.github.io</a></p>
+</div>
+
+<div id="detail" class="wrap" hidden>
+  <nav class="bar">
+    <a class="btn" href="#" id="back">← All spheres</a>
+    <div class="bar-right">
+      <div class="steps" id="steps"></div>
+      <button type="button" class="theme-btn" id="themeDetail">Theme: System</button>
+    </div>
+  </nav>
+  <div class="stage">
+    <div class="viewport">
+      <canvas id="big"></canvas>
+      <div class="readout" id="readout"></div>
+      <span class="hint" id="hint"></span>
+    </div>
+    <aside class="side">
+      <div class="side-head" id="sideHead"></div>
+      <div class="controls" id="controls"></div>
+      <div class="prose" id="prose"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ═══════════ Math & drawing primitives ═══════════
+  const TAU = Math.PI * 2, HALF = Math.PI / 2;
+  // Canvas palette. Arrays are mutated in place on theme change so scenes keep their references.
+  const THEMES = {
+    dark: {
+      bg: '#0c0e16', inset: 'rgba(6,7,12,0.8)', glow: 'lighter', k: 1,
+      pal: [[111, 183, 255], [200, 155, 255], [255, 184, 107]],
+      green: [143, 227, 176], pink: [255, 128, 150], still: STILL,
+      ink: [231, 233, 242], muted: [139, 145, 168], core: [255, 255, 255],
+    },
+    light: {
+      bg: '#ffffff', inset: 'rgba(255,255,255,0.88)', glow: 'multiply', k: 1.5,
+      pal: [[24, 104, 204], [128, 66, 196], [200, 104, 12]],
+      green: [22, 142, 84], pink: [206, 40, 86], still: [196, 110, 10],
+      ink: [21, 24, 38], muted: [93, 100, 121], core: [18, 20, 32],
+    },
+  };
+  let BG, INSET, GLOW, ALPHA_K = 1, LIGHT = false;
+  const PAL = [[], [], []], GREEN = [], PINK = [], STILL = [], INK = [], MUTED = [], WHITE = [];
+  function applyCanvasTheme(light) {
+    const T = light ? THEMES.light : THEMES.dark;
+    LIGHT = light; BG = T.bg; INSET = T.inset; GLOW = T.glow; ALPHA_K = T.k;
+    T.pal.forEach((c, i) => PAL[i].splice(0, 3, ...c));
+    for (const [arr, val] of [[GREEN, T.green], [PINK, T.pink], [STILL, T.still], [INK, T.ink], [MUTED, T.muted], [WHITE, T.core]]) arr.splice(0, 3, ...val);
+  }
+  applyCanvasTheme(false);
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${clamp(a * ALPHA_K, 0, 1).toFixed(3)})`;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function hsl(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    return [255 * f(0), 255 * f(8), 255 * f(4)];
+  }
+  // Colour a Hopf fiber by where it lands on S²: hue = longitude, lightness = latitude
+  const hopfColor = (eta, phi) => hsl(((phi * 180 / Math.PI) % 360 + 360) % 360, LIGHT ? 78 : 82, LIGHT ? 50 - 22 * (eta / HALF) : 70 - 36 * (eta / HALF));
+
+  const norm = v => { const l = Math.hypot(...v); return v.map(x => x / l); };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+  // S³ ⊂ ℝ⁴ as (z₁, z₂) = (x + iy, z + iw)
+  const torusPt = (eta, a, b) => {
+    const c = Math.cos(eta), s = Math.sin(eta);
+    return [c * Math.cos(a), c * Math.sin(a), s * Math.cos(b), s * Math.sin(b)];
+  };
+  const hopfPt = (eta, phi, t) => torusPt(eta, t, t + phi);
+  // Hopf map S³ → S², returned y-up: (2 Re z₁z̄₂, |z₁|² − |z₂|², 2 Im z₁z̄₂)
+  const hopfMap = q => [2 * (q[0] * q[2] + q[1] * q[3]), q[0] ** 2 + q[1] ** 2 - q[2] ** 2 - q[3] ** 2, 2 * (q[1] * q[2] - q[0] * q[3])];
+  // Double rotation in the x–w and y–z planes
+  function rotate4(p, a) {
+    if (!a) return p;
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(a * 0.63), sb = Math.sin(a * 0.63);
+    return [p[0] * ca - p[3] * sa, p[1] * cb - p[2] * sb, p[1] * sb + p[2] * cb, p[0] * sa + p[3] * ca];
+  }
+
+  // World (y up) → screen around centre (cx, cy). Returns [sx, sy, depth, zc]; zc > 0 faces the camera.
+  function view3(cam, cx, cy, v, camD, scale) {
+    const cyw = Math.cos(cam.yaw), syw = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+    const x1 = v[0] * cyw + v[2] * syw, z1 = -v[0] * syw + v[2] * cyw;
+    const y1 = v[1] * cp - z1 * sp, zc = v[1] * sp + z1 * cp;
+    const depth = camD - zc;
+    if (depth < 0.5) return null;
+    const s = scale * camD / depth;
+    return [cx + x1 * s, cy - y1 * s, depth, zc];
+  }
+
+  function seg(ctx, a, b, color, width = 1) {
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+  // Polyline with a per-segment style; breaks at nulls and at huge jumps (passing through infinity)
+  function curve(ctx, pt, n, style, width = 1) {
+    let prev = null;
+    for (let i = 0; i <= n; i++) {
+      const q = pt(i / n);
+      if (q && prev && Math.abs(q[0] - prev[0]) + Math.abs(q[1] - prev[1]) < 3000) seg(ctx, prev, q, typeof style === 'function' ? style(q) : style, width);
+      prev = q;
+    }
+  }
+  // Comet trail: u = 0 is the tail, u = 1 the head. Returns the head's screen point.
+  function trail(ctx, pt, n, c, wmax = 2, amul = 1) {
+    let prev = null;
+    for (let i = 0; i <= n; i++) {
+      const u = i / n, q = pt(u);
+      if (q && prev && Math.abs(q[0] - prev[0]) + Math.abs(q[1] - prev[1]) < 3000) {
+        seg(ctx, prev, q, rgba(c, u * u * 0.85 * amul * (q.fade ?? 1) * (q.face ?? 1)), 0.4 + u * wmax);
+      }
+      prev = q;
+    }
+    return prev;
+  }
+  function dot(ctx, q, r, c, a = 1) {
+    ctx.fillStyle = rgba(c, 0.2 * a); ctx.beginPath(); ctx.arc(q[0], q[1], r * 3, 0, TAU); ctx.fill();
+    ctx.fillStyle = rgba(WHITE, 0.92 * a); ctx.beginPath(); ctx.arc(q[0], q[1], r * 0.8, 0, TAU); ctx.fill();
+  }
+  function ring(ctx, q, r, c, a = 1) {
+    ctx.strokeStyle = rgba(c, a); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, TAU); ctx.stroke();
+  }
+  function label(ctx, text, x, y, c = MUTED, align = 'left', size = 11) {
+    ctx.fillStyle = rgba(c, 0.92); ctx.font = `${size}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y);
+  }
+  function pole(ctx, q, text = 'N') {
+    if (!q) return;
+    ctx.fillStyle = rgba(INK, 0.95); ctx.beginPath(); ctx.arc(q[0], q[1], 3, 0, TAU); ctx.fill();
+    label(ctx, text, q[0] + 9, q[1] - 9, INK);
+  }
+  function edgeArrow(ctx, right, w, y, c) {
+    const x = right ? w - 8 : 8, d = right ? -9 : 9;
+    ctx.fillStyle = rgba(c, 0.9);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + d, y - 5); ctx.lineTo(x + d, y + 5); ctx.fill();
+  }
+  function glowOn(ctx) { ctx.globalCompositeOperation = GLOW; ctx.lineCap = 'round'; }
+  function glowOff(ctx) { ctx.globalCompositeOperation = 'source-over'; }
+
+  // ═══════════ Scenes ═══════════
+  // Each scene draws into (ctx, w, h) at flow time t and returns an info object for the readout.
+
+  // S¹ in ℝ², shadow on the tangent line y = −1
+  function sceneS1(ctx, w, h, t, cam, o) {
+    const s = Math.min(w / 10, h / 3.5) * cam.zoom, ox = w / 2, oy = h * 0.46;
+    const X = x => ox + x * s, Y = y => oy - y * s;
+    const sh = th => 2 * Math.cos(th) / (1 - Math.sin(th));
+    const lineY = Y(-1);
+
+    seg(ctx, [0, lineY], [w, lineY], rgba(MUTED, 0.5));
+    for (let i = -40; i <= 40; i++) {
+      const x = X(i);
+      if (x < 6 || x > w - 6) continue;
+      seg(ctx, [x, lineY - 3], [x, lineY + 3], rgba(MUTED, 0.5));
+      if (i % 2 === 0) label(ctx, String(i), x, lineY + 14, MUTED, 'center');
+    }
+    label(ctx, 'ℝ¹', w - 10, lineY - 12, MUTED, 'right');
+    ctx.strokeStyle = rgba(INK, 0.3); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(ox, oy, s, 0, TAU); ctx.stroke();
+    const N = [X(0), Y(1)];
+
+    const shadowScreen = th => (1 - Math.sin(th) < 1e-4 ? null : [X(sh(th)), lineY]);
+    const onScreen = q => q && Math.abs(q[0] - w / 2) < w / 2 + 20;
+    const drawRay = (head, shq, color) => {
+      const end = onScreen(shq) ? shq : [N[0] + (head[0] - N[0]) * 40, N[1] + (head[1] - N[1]) * 40];
+      seg(ctx, N, end, color);
+    };
+
+    glowOn(ctx);
+    for (let k = 0; k < o.n; k++) {
+      const c = PAL[k % 3], th = t + (k / o.n) * TAU;
+      const head = [X(Math.cos(th)), Y(Math.sin(th))], shq = shadowScreen(th);
+      if (o.rays) drawRay(head, shq, rgba(c, 0.2));
+      if (o.trails) {
+        trail(ctx, u => { const a = th - (1 - u); return [X(Math.cos(a)), Y(Math.sin(a))]; }, 28, c, 2);
+        trail(ctx, u => { const a = th - (1 - u); return 1 - Math.sin(a) < 0.02 ? null : [X(sh(a)), lineY]; }, 28, c, 2.5);
+      }
+      dot(ctx, head, 2.6, c);
+      if (onScreen(shq)) dot(ctx, shq, 2.6, c);
+      else edgeArrow(ctx, Math.cos(th) > 0, w, lineY, c);
+    }
+    glowOff(ctx);
+
+    let info = null;
+    if (o.probe != null) {
+      const th = o.probe, head = [X(Math.cos(th)), Y(Math.sin(th))], shq = shadowScreen(th);
+      drawRay(head, shq, rgba(WHITE, 0.75));
+      ring(ctx, head, 6, WHITE);
+      if (onScreen(shq)) ring(ctx, shq, 6, WHITE); else if (shq) edgeArrow(ctx, Math.cos(th) > 0, w, lineY, WHITE);
+      info = { x: Math.cos(th), y: Math.sin(th), xs: shq ? sh(th) : Infinity };
+    }
+    pole(ctx, N);
+    return info;
+  }
+
+  // S² in ℝ³, shadow on the tangent plane y = −1
+  function circleOnSphere(n, c) {
+    n = norm(n);
+    const u = norm(cross(n, Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), v = cross(n, u), rho = Math.sqrt(1 - c * c);
+    return a => [0, 1, 2].map(i => c * n[i] + rho * (u[i] * Math.cos(a) + v[i] * Math.sin(a)));
+  }
+  const TILTED = circleOnSphere([0.6, -0.6, 0.5], 0.35);
+  const N_PLANE = norm([0.9, 0.35, -0.3]);
+  const THROUGH_N = circleOnSphere(N_PLANE, N_PLANE[1]);
+
+  function sceneS2(ctx, w, h, t, cam, o) {
+    const scale = Math.min(w, h) * 0.135 * cam.zoom, camD = 11, ext = o.detail ? 4 : 3.2;
+    const P = v => view3(cam, w / 2, h / 2 + h * 0.04, v, camD, scale);
+    const shadowOf = v => {
+      const d = 1 - v[1];
+      if (d < 0.012) return null;
+      const k = 2 / d, x = v[0] * k, z = v[2] * k;
+      return x * x + z * z > 400 ? null : [x, -1, z];
+    };
+    const PS = v => { const s = shadowOf(v); return s ? P(s) : null; };
+    const onLat = (y, a) => { const r = Math.sqrt(1 - y * y); return [r * Math.cos(a), y, r * Math.sin(a)]; };
+    const facing = q => (q && q[3] > 0 ? 1 : 0.35);
+
+    for (let g = -ext; g <= ext + 1e-6; g += 0.8) {
+      const a = P([g, -1, -ext]), b = P([g, -1, ext]), c = P([-ext, -1, g]), d = P([ext, -1, g]);
+      if (a && b) seg(ctx, a, b, rgba(MUTED, 0.1));
+      if (c && d) seg(ctx, c, d, rgba(MUTED, 0.1));
+    }
+    const lab = P([ext, -1, ext]);
+    if (lab) label(ctx, 'ℝ²', lab[0] + 6, lab[1], MUTED);
+
+    const extras = [];
+    if (o.tilted) extras.push({ fn: TILTED, c: GREEN });
+    if (o.throughN) extras.push({ fn: THROUGH_N, c: PINK });
+
+    if (o.paths) {
+      o.lats.forEach((y, li) => curve(ctx, u => PS(onLat(y, u * TAU)), 120, rgba(PAL[li % 3], 0.24)));
+      for (const e of extras) curve(ctx, u => PS(e.fn(u * TAU)), 240, rgba(e.c, 0.4), 1.2);
+    }
+
+    const wire = fn => curve(ctx, u => P(fn(u)), 60, q => rgba(INK, q[3] > 0 ? 0.15 : 0.05));
+    for (let m = 0; m < 12; m++) {
+      const a = (m / 12) * TAU + t * 0.25;
+      wire(u => { const ph = u * Math.PI; return [Math.sin(ph) * Math.cos(a), Math.cos(ph), Math.sin(ph) * Math.sin(a)]; });
+    }
+    for (const y of [-0.8, -0.4, 0, 0.4, 0.8]) wire(u => onLat(y, u * TAU));
+
+    if (o.paths) {
+      o.lats.forEach((y, li) => curve(ctx, u => P(onLat(y, u * TAU)), 96, q => rgba(PAL[li % 3], q[3] > 0 ? 0.45 : 0.14), 1.2));
+      for (const e of extras) curve(ctx, u => P(e.fn(u * TAU)), 120, q => rgba(e.c, q[3] > 0 ? 0.6 : 0.2), 1.4);
+    }
+
+    const N = P([0, 1, 0]);
+    glowOn(ctx);
+    o.lats.forEach((y, li) => {
+      const c = PAL[li % 3];
+      for (let k = 0; k < o.per; k++) {
+        const a0 = t + (k / o.per) * TAU + li * 0.5;
+        const hs = trail(ctx, u => { const q = P(onLat(y, a0 - 1.1 * (1 - u))); if (q) q.face = facing(q); return q; }, 26, c, 2);
+        const hp = trail(ctx, u => PS(onLat(y, a0 - 1.1 * (1 - u))), 26, c, 2);
+        if (o.rays && k === 0 && N && hs) {
+          seg(ctx, N, hs, rgba(c, 0.55));
+          if (hp) seg(ctx, hs, hp, rgba(c, 0.3));
+        }
+        if (hp) dot(ctx, hp, 2.3, c);
+        if (hs) dot(ctx, hs, 2.3, c, facing(hs));
+      }
+    });
+    for (const e of extras) {
+      const a0 = t * 1.3;
+      const hs = trail(ctx, u => { const q = P(e.fn(a0 - 1.2 * (1 - u))); if (q) q.face = facing(q); return q; }, 30, e.c, 2.2);
+      const hp = trail(ctx, u => PS(e.fn(a0 - 1.2 * (1 - u))), 30, e.c, 2.2);
+      if (o.rays && N && hs) { seg(ctx, N, hs, rgba(e.c, 0.55)); if (hp) seg(ctx, hs, hp, rgba(e.c, 0.3)); }
+      if (hs) dot(ctx, hs, 2.6, e.c, facing(hs));
+      if (hp) dot(ctx, hp, 2.6, e.c);
+    }
+    glowOff(ctx);
+    pole(ctx, N);
+    const S = P([0, -1, 0]);
+    if (S && o.detail) label(ctx, 'still points: N and S', S[0] + 10, S[1] + 14, MUTED);
+    return {};
+  }
+
+  // Clifford-type torus |z₁| = cos η, |z₂| = sin η inside S³, shadowed into ℝ³
+  function shadowS3(q) {
+    const d = 1 - q[3];
+    if (d < 0.03) return null;
+    const v = [q[0] / d, q[2] / d, q[1] / d];
+    if (v[0] * v[0] + v[1] * v[1] + v[2] * v[2] > 900) return null;
+    v.fade = Math.min(1, (d - 0.03) / 0.25);
+    return v;
+  }
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  const KNOTS = { '2,3': 'trefoil knot (3₁)', '2,5': 'cinquefoil knot (5₁)', '2,7': '7₁ knot', '3,4': '8₁₉ knot', '3,5': '10₁₂₄ knot' };
+
+  function sceneTorus(ctx, w, h, t, cam, o) {
+    const c = Math.cos(o.eta), s = Math.sin(o.eta);
+    const extent = Math.max(c / (1 - s), Math.tan(o.eta)); // exact size of the shadow torus
+    const scale = Math.min(w, h) * 0.36 / extent * cam.zoom, camD = extent * 5;
+    const P = q => { const v = shadowS3(q); if (!v) return null; const r = view3(cam, w / 2, h / 2, v, camD, scale); if (r) r.fade = v.fade; return r; };
+
+    if (o.grid) {
+      const G = o.detail ? 18 : 12;
+      for (let i = 0; i < G; i++) {
+        const k = (i / G) * TAU;
+        curve(ctx, u => P(torusPt(o.eta, k, u * TAU)), 72, q => rgba(INK, (q[3] > 0 ? 0.14 : 0.05) * q.fade));
+        curve(ctx, u => P(torusPt(o.eta, u * TAU, k)), 72, q => rgba(INK, (q[3] > 0 ? 0.14 : 0.05) * q.fade));
+      }
+    }
+    const p = o.p, qn = o.q, g = gcd(p, qn), pr = p / g, qr = qn / g;
+    const col = o.p === 1 && o.q === 1 ? hopfColor(o.eta, 0) : PAL[2];
+    const curvePt = tt => torusPt(o.eta, pr * tt, qr * tt);
+    curve(ctx, u => P(curvePt(u * TAU)), 360, q => rgba(col, (q[3] > 0 ? 0.55 : 0.2) * q.fade), 1.4);
+
+    glowOn(ctx);
+    const L = 1.4 / Math.max(pr, qr);
+    for (let k = 0; k < o.n; k++) {
+      const head = t / Math.max(pr, qr) + (k / o.n) * TAU;
+      const hp = trail(ctx, u => P(curvePt(head - L * (1 - u))), 32, col, 2.2);
+      if (hp) dot(ctx, hp, 2.5, col, hp.fade);
+    }
+    glowOff(ctx);
+
+    if (o.square) {
+      const S = Math.min(140, w * 0.22), x0 = 16, y0 = h - 16 - S;
+      ctx.fillStyle = INSET; ctx.fillRect(x0 - 8, y0 - 22, S + 16, S + 44);
+      ctx.strokeStyle = rgba(MUTED, 0.6); ctx.lineWidth = 1; ctx.strokeRect(x0, y0, S, S);
+      // glued-edge marks: single arrows on left/right, double on top/bottom
+      const arrow = (x, y, dx, dy) => { ctx.beginPath(); ctx.moveTo(x - dx * 5 - dy * 4, y - dy * 5 + dx * 4); ctx.lineTo(x, y); ctx.lineTo(x - dx * 5 + dy * 4, y - dy * 5 - dx * 4); ctx.stroke(); };
+      ctx.strokeStyle = rgba(INK, 0.8);
+      arrow(x0, y0 + S / 2, 0, -1); arrow(x0 + S, y0 + S / 2, 0, -1);
+      arrow(x0 + S / 2, y0, 1, 0); arrow(x0 + S / 2 + 6, y0, 1, 0); arrow(x0 + S / 2, y0 + S, 1, 0); arrow(x0 + S / 2 + 6, y0 + S, 1, 0);
+      const SQ = (a, b) => [x0 + (((a % TAU) + TAU) % TAU) / TAU * S, y0 + S - (((b % TAU) + TAU) % TAU) / TAU * S];
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, S, S); ctx.clip();
+      let prev = null;
+      for (let i = 0; i <= 600; i++) {
+        const tt = (i / 600) * TAU, q = SQ(pr * tt, qr * tt);
+        if (prev && Math.abs(q[0] - prev[0]) < S / 2 && Math.abs(q[1] - prev[1]) < S / 2) seg(ctx, prev, q, rgba(col, 0.75), 1.2);
+        prev = q;
+      }
+      for (let k = 0; k < o.n; k++) {
+        const head = t / Math.max(pr, qr) + (k / o.n) * TAU;
+        ctx.fillStyle = rgba(WHITE, 0.95); const d = SQ(pr * head, qr * head);
+        ctx.beginPath(); ctx.arc(d[0], d[1], 2.5, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+      label(ctx, 'flat torus: glue opposite edges', x0, y0 - 12, MUTED, 'left', 10);
+      label(ctx, 'a → around the hole', x0, y0 + S + 12, MUTED, 'left', 10);
+    }
+    const name = g > 1 ? `(${pr},${qr}) curve` : (pr === 1 || qr === 1 ? (pr === 1 && qr === 1 ? 'Hopf fiber (unknot)' : 'unknot') : (KNOTS[`${Math.min(pr, qr)},${Math.max(pr, qr)}`] || `(${pr},${qr}) torus knot`));
+    return { c, s, extent, name, pr, qr };
+  }
+
+  // S³ Hopf fibration, shadowed into ℝ³
+  function makeFibers(etas, per) {
+    const out = [];
+    etas.forEach((eta, ti) => {
+      for (let k = 0; k < per; k++) {
+        const phi = (k / per) * TAU + ti * 0.37;
+        out.push({ eta, phi, rgb: hopfColor(eta, phi), phase: k * 2.399963 + ti });
+      }
+    });
+    return out;
+  }
+  const etaSpread = n => Array.from({ length: n }, (_, i) => Math.PI * (n === 1 ? 0.22 : 0.1 + (0.22 * i) / (n - 1)));
+
+  function sceneS3(ctx, w, h, t, cam, o) {
+    const scale = Math.min(w, h) * 0.2 * cam.zoom * (o.scaleMul ?? 1), camD = 9, a = o.tumble || 0;
+    const P = q => { const v = shadowS3(rotate4(q, a)); if (!v) return null; const r = view3(cam, w / 2, h / 2, v, camD, scale); if (r) r.fade = v.fade; return r; };
+    const near = q => clamp((camD + 3 - q[2]) / 8, 0, 1);
+    if (o.paths) for (const f of o.fibers) curve(ctx, u => P(hopfPt(f.eta, f.phi, u * TAU)), 128, q => rgba(f.rgb, (0.05 + 0.17 * near(q)) * q.fade));
+    if (o.particles !== false) {
+      glowOn(ctx);
+      for (const f of o.fibers) {
+        const head = t + f.phase;
+        const hp = trail(ctx, u => P(hopfPt(f.eta, f.phi, head - 1.5 * (1 - u))), 32, f.rgb, 2);
+        if (hp) dot(ctx, hp, 2.1 * (camD / hp[2]), f.rgb, hp.fade);
+      }
+      glowOff(ctx);
+    }
+    if (o.inset) insetS2(ctx, w - 96, 96, 58, cam, o.fibers);
+    return {};
+  }
+
+  function insetS2(ctx, cx, cy, R, cam, fibers) {
+    ctx.fillStyle = INSET; ctx.beginPath(); ctx.arc(cx, cy, R + 26, 0, TAU); ctx.fill();
+    ctx.strokeStyle = rgba(MUTED, 0.3); ctx.lineWidth = 1; ctx.stroke();
+    const c2 = { yaw: cam.yaw, pitch: 0.4 };
+    const P = v => view3(c2, cx, cy, v, 8, R * 0.93);
+    for (const y of [-0.6, 0, 0.6]) {
+      const r = Math.sqrt(1 - y * y);
+      curve(ctx, u => P([r * Math.cos(u * TAU), y, r * Math.sin(u * TAU)]), 48, q => rgba(INK, q[3] > 0 ? 0.18 : 0.06));
+    }
+    for (let m = 0; m < 6; m++) {
+      const a = (m / 6) * Math.PI;
+      curve(ctx, u => { const ph = u * TAU; return P([Math.sin(ph) * Math.cos(a), Math.cos(ph), Math.sin(ph) * Math.sin(a)]); }, 48, q => rgba(INK, q[3] > 0 ? 0.12 : 0.04));
+    }
+    for (const f of fibers) {
+      const q = P(hopfMap(hopfPt(f.eta, f.phi, 0)));
+      if (!q) continue;
+      ctx.fillStyle = rgba(f.rgb, q[3] > 0 ? 1 : 0.3);
+      ctx.beginPath(); ctx.arc(q[0], q[1], 3, 0, TAU); ctx.fill();
+    }
+    label(ctx, 'S² · one dot per ring', cx, cy + R + 14, MUTED, 'center', 10);
+  }
+
+  // S⁴ ⊂ ℝ⁵ sliced at x₅ = v: each slice is a 3-sphere of radius √(1 − v²)
+  function sceneS4(ctx, w, h, t, cam, o) {
+    const v = o.v, r = Math.sqrt(Math.max(0, 1 - v * v));
+    if (r > 0.02) sceneS3(ctx, w, h, t, cam, { fibers: o.fibers, paths: true, scaleMul: r });
+    else {
+      glowOn(ctx);
+      dot(ctx, [w / 2, h / 2], 5, STILL);
+      glowOff(ctx);
+      label(ctx, v > 0 ? 'north still point' : 'south still point', w / 2, h / 2 + 26, INK, 'center');
+    }
+    // Profile: S⁴ seen edge-on along x₅, with the current slice
+    const R = Math.min(62, w * 0.1), cx = 22 + R, cy = h - 34 - R;
+    ctx.fillStyle = INSET; ctx.fillRect(cx - R - 14, cy - R - 26, 2 * R + 28, 2 * R + 52);
+    ctx.strokeStyle = rgba(INK, 0.35); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+    seg(ctx, [cx, cy - R - 8], [cx, cy + R + 8], rgba(MUTED, 0.4));
+    const yv = cy - v * R;
+    seg(ctx, [cx - r * R, yv], [cx + r * R, yv], rgba(STILL, 0.95), 2);
+    ctx.fillStyle = rgba(INK, 0.9);
+    for (const yy of [cy - R, cy + R]) { ctx.beginPath(); ctx.arc(cx, yy, 2.5, 0, TAU); ctx.fill(); }
+    label(ctx, 'x₅', cx + 6, cy - R - 14, MUTED, 'left', 10);
+    label(ctx, 'slice = S³', cx, cy + R + 16, MUTED, 'center', 10);
+    return { v, r };
+  }
+
+  // ═══════════ Pages ═══════════
+  const fmt = (x, d = 3) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d);
+  const deg = x => `${Math.round(x * 180 / Math.PI)}°`;
+
+  const PAGES = [
+    {
+      id: 's1', name: 'Circle', sym: 'S¹', eq: 'x² + y² = 1',
+      meta: '<b>1-D</b> curve · lives in ℝ² · shadow on ℝ¹',
+      blurb: 'Points slide around; their shadows run along a line.',
+      flat: true,
+      cam: { zoom: 1 },
+      card: { n: 7, rays: true, trails: true, probe: null },
+      opts: { speed: 0.5, n: 7, rays: true, trails: true, probe: 0.6 },
+      controls: [
+        { type: 'range', key: 'speed', label: 'Flow speed', min: 0, max: 2, step: 0.01, fmt: v => v.toFixed(2) },
+        { type: 'range', key: 'n', label: 'Points', min: 1, max: 16, step: 1, fmt: v => v },
+        { type: 'range', key: 'probe', label: 'Probe angle θ', min: -Math.PI / 2, max: Math.PI / 2 - 0.002, step: 0.001, fmt: v => deg(v) },
+        { type: 'toggle', key: 'rays', label: 'Light rays' },
+        { type: 'toggle', key: 'trails', label: 'Trails' },
+      ],
+      scene: sceneS1,
+      readout: i => i ? [['probe', `(${fmt(i.x)}, ${fmt(i.y)})`], ['x² + y²', (i.x * i.x + i.y * i.y).toFixed(6)], ['shadow x′', isFinite(i.xs) && Math.abs(i.xs) < 1e6 ? fmt(i.xs) : '∞']] : [],
+      hint: 'The white probe is yours: move it with the angle slider',
+      prose: `
+        <section><h3>What it is</h3><p>Every point at distance 1 from the origin of the plane. It is <b>one-dimensional</b>: an ant living on it can only walk forwards or backwards. With complex numbers it is simply <span class="f">{ e^{iθ} }</span>.</p></section>
+        <section><h3>The flow</h3><p>Every point moves by multiplying by <span class="f">e^{it}</span>, so it slides round at a constant speed. <b>No point ever stands still.</b> Keep that in mind: it's true for S³ too, but not for S² or S⁴.</p></section>
+        <section><h3>The shadow</h3><p>A ray from <span class="f">N = (0, 1)</span> through a point <span class="f">(x, y)</span> hits the line <span class="f">y = −1</span> at <span class="f">x′ = 2x ⁄ (1 − y)</span>. Every point except N gets exactly one shadow, so the circle is <b>the line plus one point at infinity</b>: <span class="f">S¹ = ℝ ∪ {∞}</span>.</p></section>
+        <section><h3>Try this</h3><p>Slide the probe towards 90°. The point creeps up to N while its shadow sprints off towards infinity. Just past N it reappears from the other end of the line.</p></section>`,
+    },
+    {
+      id: 's2', name: 'Sphere', sym: 'S²', eq: 'x² + y² + z² = 1',
+      meta: '<b>2-D</b> surface · lives in ℝ³ · shadow on ℝ²',
+      blurb: 'Latitudes flow round; their shadows are circles on a plane.',
+      cam: { yaw: 0.5, pitch: 0.42, zoom: 1 },
+      card: { lats: [0.35, -0.1, -0.55], per: 6, rays: true, paths: true },
+      opts: { speed: 0.5, per: 6, rays: true, paths: true, tilted: true, throughN: false, lats: [0.35, -0.1, -0.55] },
+      controls: [
+        { type: 'range', key: 'speed', label: 'Flow speed', min: 0, max: 2, step: 0.01, fmt: v => v.toFixed(2) },
+        { type: 'range', key: 'per', label: 'Points per latitude', min: 1, max: 14, step: 1, fmt: v => v },
+        { type: 'toggle', key: 'rays', label: 'Light rays' },
+        { type: 'toggle', key: 'paths', label: 'Paths' },
+        { type: 'toggle', key: 'tilted', label: 'Tilted circle' },
+        { type: 'toggle', key: 'throughN', label: 'Circle through N' },
+      ],
+      scene: sceneS2,
+      readout: () => [['latitudes', 'y = +0.35, −0.10, −0.55'], ['shadow', '2(x, z) ⁄ (1 − y)']],
+      hint: 'Drag to turn · scroll to zoom · double-click to reset',
+      prose: `
+        <section><h3>What it is</h3><p>Every point at distance 1 from the origin in space: the <b>surface</b> of a ball. It's called S² because the surface itself is 2-D, even though it sits in 3-D.</p></section>
+        <section><h3>The flow</h3><p>Spinning about the vertical axis moves each point along its latitude, but <b>the poles never move</b>. That isn't bad luck. The <b>hairy ball theorem</b> says every smooth flow on S² has a still point somewhere, and the same goes for S⁴.</p></section>
+        <section><h3>The shadow</h3><p>The ray from N through <span class="f">(x, y, z)</span> lands on the plane at <span class="f">2(x, z) ⁄ (1 − y)</span>. Latitudes become circles round the centre, and the higher the latitude, the bigger its shadow. The plane plus one point at infinity is the sphere, known as the <b>Riemann sphere</b>.</p></section>
+        <section><h3>Circles stay circles</h3><p>Turn on the <b>tilted circle</b> (green): its shadow is still a perfect circle, just off-centre. Then turn on the <b>circle through N</b> (pink): its shadow is a straight line, a circle through infinity. This rule is exactly why the rings on the S³ page stay perfectly round.</p></section>`,
+    },
+    {
+      id: 'torus', name: 'Torus', sym: 'T²', eq: '|z₁| = cos η, |z₂| = sin η',
+      meta: '<b>2-D</b> surface · S¹ × S¹ · the bridge to S³',
+      blurb: 'Two circles at once. S³ is built from a stack of these.',
+      cam: { yaw: 0.4, pitch: 0.55, zoom: 1 },
+      card: { eta: Math.PI / 4, p: 2, q: 3, n: 3, grid: true, square: false },
+      opts: { speed: 0.6, eta: Math.PI / 4, p: 1, q: 1, n: 5, grid: true, square: true },
+      controls: [
+        { type: 'range', key: 'speed', label: 'Flow speed', min: 0, max: 2, step: 0.01, fmt: v => v.toFixed(2) },
+        { type: 'range', key: 'eta', label: 'Torus η (which slice of S³)', min: 8 * Math.PI / 180, max: 76 * Math.PI / 180, step: 0.001, fmt: v => deg(v) },
+        { type: 'range', key: 'p', label: 'p · turns around the hole', min: 1, max: 5, step: 1, fmt: v => v },
+        { type: 'range', key: 'q', label: 'q · turns around the tube', min: 1, max: 5, step: 1, fmt: v => v },
+        { type: 'range', key: 'n', label: 'Particles', min: 1, max: 12, step: 1, fmt: v => v },
+        { type: 'toggle', key: 'grid', label: 'Grid circles' },
+        { type: 'toggle', key: 'square', label: 'Flat square' },
+      ],
+      scene: sceneTorus,
+      readout: i => [['η', deg(PAGES[2].opts.eta)], ['|z₁|, |z₂|', `${i.c.toFixed(3)}, ${i.s.toFixed(3)}`], ['curve', `(${i.pr}, ${i.qr})`], ['type', i.name]],
+      hint: 'Set p = 2, q = 3 for a trefoil · drag to turn',
+      prose: `
+        <section><h3>What a torus is</h3><p>A torus is <span class="f">S¹ × S¹</span>: one angle takes you around the hole, another around the tube. Cut it open and it's a <b>square with opposite edges glued</b>, shown bottom-left. A path leaving the right edge comes back in on the left.</p></section>
+        <section><h3>Tori inside S³</h3><p>Write a point of S³ as two complex numbers with <span class="f">|z₁|² + |z₂|² = 1</span>. Fixing <span class="f">|z₁| = cos η</span> forces <span class="f">|z₂| = sin η</span>, which leaves just two free angles, so each slice is a torus. <b>S³ is a stack of these tori</b>, squeezed down to a circle at η = 0° and to another circle at η = 90°.</p></section>
+        <section><h3>The shadow</h3><p>Stereographic projection turns each torus into a donut in ℝ³. At <b>η = 45°</b> it is the <b>Clifford torus</b>. In S³ it's perfectly flat, the same geometry as the square, even though its shadow looks curved. Push η up and the donut balloons, because it wraps closer to the pole N.</p></section>
+        <section><h3>Curves that wind</h3><p>A curve that goes <b>p</b> times around the hole and <b>q</b> times around the tube is a <span class="f">(p, q)</span> torus curve. <span class="f">(1, 1)</span> is a <b>Hopf fiber</b>, exactly one of the rings on the S³ page. <span class="f">(2, 3)</span> is a trefoil knot. On the flat square every one of them is just a straight line.</p></section>`,
+    },
+    {
+      id: 's3', name: 'Hypersphere', sym: 'S³', eq: 'x² + y² + z² + w² = 1',
+      meta: '<b>3-D</b> space · lives in ℝ⁴ · shadow in ℝ³',
+      blurb: 'Great circles become linked rings on nested tori.',
+      cam: { yaw: 0.6, pitch: 0.45, zoom: 1 },
+      card: { tori: 3, per: 9, paths: true, inset: false },
+      opts: { speed: 0.5, tori: 3, per: 10, paths: true, particles: true, tumble: false, inset: true },
+      controls: [
+        { type: 'range', key: 'speed', label: 'Flow speed', min: 0, max: 2, step: 0.01, fmt: v => v.toFixed(2) },
+        { type: 'range', key: 'tori', label: 'Nested tori', min: 1, max: 5, step: 1, fmt: v => v },
+        { type: 'range', key: 'per', label: 'Rings per torus', min: 3, max: 24, step: 1, fmt: v => v },
+        { type: 'toggle', key: 'paths', label: 'Rings' },
+        { type: 'toggle', key: 'particles', label: 'Particles' },
+        { type: 'toggle', key: 'inset', label: 'S² map' },
+        { type: 'toggle', key: 'tumble', label: '4D tumble' },
+      ],
+      scene: sceneS3,
+      readout: () => { const o = PAGES[3].opts; return [['rings', String(o.tori * o.per)], ['linked pairs', String((o.tori * o.per) * (o.tori * o.per - 1) / 2)], ['linking no.', '1 for every pair']]; },
+      hint: 'Drag to turn · scroll to zoom · double-click to reset',
+      prose: `
+        <section><h3>Two complex numbers</h3><p>S³ is every pair <span class="f">(z₁, z₂)</span> with <span class="f">|z₁|² + |z₂|² = 1</span>. That's four real coordinates with <span class="f">x² + y² + z² + w² = 1</span>: a 3-dimensional space curled up inside ℝ⁴, the way S² is a surface curled up inside ℝ³.</p></section>
+        <section><h3>The Hopf flow</h3><p>Multiply both numbers by <span class="f">e^{it}</span>. Like S¹ and unlike S², <b>every point moves</b>, and every orbit is a great circle. These circles, the <b>Hopf fibers</b>, fill all of S³ without ever crossing.</p></section>
+        <section><h3>Tori and rings</h3><p>Each colour shade sits on one torus from the torus page. Each ring is a <span class="f">(1, 1)</span> curve on its torus. It goes once around the hole and once around the tube, which is why the rings lean.</p></section>
+        <section><h3>Every pair is linked</h3><p>Pick any two rings: they're linked exactly once, like two links of a chain. The Python checker measures this with <b>Gauss's linking integral</b> and gets 1.000 for every pair it tries.</p></section>
+        <section><h3>One ring, one point</h3><p>The Hopf map <span class="f">h(z₁, z₂) = (2z₁z̄₂, |z₁|² − |z₂|²)</span> sends <b>each whole ring to a single point of S²</b>, shown top-right in matching colours. Rings on the same torus land on the same latitude. While the particles race round, those dots never move.</p></section>
+        <section><h3>4D tumble</h3><p>Rotating in ℝ⁴ pushes rings through the pole N. Their shadows swell, pass through infinity (a straight line for an instant) and come back. It's the pink line from the S² page, one dimension up.</p></section>`,
+    },
+    {
+      id: 's4', name: '4-sphere', sym: 'S⁴', eq: 'x₁² + … + x₅² = 1',
+      meta: '<b>4-D</b> space · lives in ℝ⁵ · seen by slicing',
+      blurb: 'A stack of 3-spheres that shrink to two still points.',
+      cam: { yaw: 0.6, pitch: 0.45, zoom: 1 },
+      card: { tori: 3, per: 7, sweep: true },
+      opts: { speed: 0.5, per: 8, v: 0.3, sweep: true, sweepSpeed: 0.35 },
+      controls: [
+        { type: 'range', key: 'speed', label: 'Flow speed', min: 0, max: 2, step: 0.01, fmt: v => v.toFixed(2) },
+        { type: 'range', key: 'v', label: 'Slice height x₅ = v', min: -1, max: 1, step: 0.001, fmt: v => fmt(v, 2) },
+        { type: 'range', key: 'per', label: 'Rings per torus', min: 3, max: 16, step: 1, fmt: v => v },
+        { type: 'toggle', key: 'sweep', label: 'Auto-sweep slice' },
+      ],
+      scene: sceneS4,
+      readout: i => [['x₅', fmt(i.v, 3)], ['slice radius', i.r.toFixed(3)], ['slice volume', (2 * Math.PI * Math.PI * i.r ** 3).toFixed(3)]],
+      hint: 'Turn off auto-sweep and drag the slice to ±1',
+      prose: `
+        <section><h3>One more step</h3><p>S⁴ is every point of ℝ⁵ at distance 1 from the origin. Its shadow would fill ℝ⁴, and we can't see that either, so we switch tricks: <b>slicing</b>.</p></section>
+        <section><h3>Slicing, one level down</h3><p>Push S² through a plane and a Flatlander sees a dot grow into a circle and shrink away. Push S³ through our space and we'd see a point swell into a sphere and vanish. Push S⁴ through ℝ⁴ and <b>every moment is a whole S³</b>.</p></section>
+        <section><h3>What you're seeing</h3><p>Fix <span class="f">x₅ = v</span>. What remains is a 3-sphere of radius <span class="f">√(1 − v²)</span>. The main view draws that slice's Hopf rings, scaled to its radius, and the profile bottom-left shows where the slice sits. <b>Stack every slice and you have S⁴.</b></p></section>
+        <section><h3>The still points</h3><p>Run the Hopf flow on every slice at once and all of S⁴ moves, except at <span class="f">v = ±1</span>, where the slice is a single point with nowhere to go. That's the hairy ball theorem again: <b>even spheres (S², S⁴, …) always keep a still point; odd ones (S¹, S³, …) can flow everywhere.</b></p></section>
+        <section><h3>How big is each sphere?</h3>
+          <table>
+            <tr><th>Sphere</th><th>Measure</th><th>Exact</th><th>Value</th></tr>
+            <tr><td>S¹</td><td>length</td><td>2π</td><td>6.283</td></tr>
+            <tr><td>S²</td><td>area</td><td>4π</td><td>12.566</td></tr>
+            <tr><td>S³</td><td>volume</td><td>2π²</td><td>19.739</td></tr>
+            <tr><td>S⁴</td><td>4-volume</td><td>8π²⁄3</td><td>26.319</td></tr>
+            <tr><td>S⁵</td><td>5-volume</td><td>π³</td><td>31.006</td></tr>
+            <tr><td>S⁶</td><td>6-volume</td><td>16π³⁄15</td><td class="peak">33.073</td></tr>
+            <tr><td>S⁷</td><td>7-volume</td><td>π⁴⁄3</td><td>32.470</td></tr>
+          </table>
+          <p style="margin-top:8px">Unit spheres grow until <b>S⁶</b>, then shrink towards zero as the dimension climbs.</p></section>
+        <section><h3>Hopf, one level up</h3><p>With quaternions in place of complex numbers, S⁷ splits into S³-shaped fibers lying over S⁴, just as S³ splits into circles over S². The pattern continues, and stops after one more step, with octonions: S¹⁵ → S⁸.</p></section>`,
+    },
+  ];
+
+  // Per-frame scene options, derived from a page's settings
+  function sceneOpts(page, o, detail, t) {
+    switch (page.id) {
+      case 's1': return { ...o, detail };
+      case 's2': return { ...o, detail };
+      case 'torus': return { ...o, detail };
+      case 's3': {
+        const key = `${o.tori}:${o.per}`;
+        if (page._fkey !== key) { page._fkey = key; page._fibers = makeFibers(etaSpread(o.tori), o.per); }
+        return { ...o, fibers: page._fibers, tumble: o.tumble ? page._tumble : 0, detail };
+      }
+      case 's4': {
+        const key = `4:${o.per}`;
+        if (page._fkey !== key) { page._fkey = key; page._fibers = makeFibers(etaSpread(3), o.per); }
+        return { ...o, fibers: page._fibers, detail };
+      }
+    }
+  }
+
+  // ═══════════ Canvas plumbing ═══════════
+  function surface(el) {
+    const s = { el, ctx: el.getContext('2d'), w: 0, h: 0 };
+    const fit = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      s.w = el.clientWidth; s.h = el.clientHeight;
+      el.width = Math.round(s.w * dpr); el.height = Math.round(s.h * dpr);
+      s.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    new ResizeObserver(fit).observe(el);
+    fit();
+    return s;
+  }
+  function paint(surf, page, opts, t, cam) {
+    const { ctx, w, h } = surf;
+    if (!w || !h) return null;
+    ctx.fillStyle = BG; ctx.fillRect(0, 0, w, h);
+    return page.scene(ctx, w, h, t, cam, opts);
+  }
+
+  // Home cards
+  const cardsEl = document.getElementById('cards');
+  const cards = PAGES.map(page => {
+    const a = document.createElement('a');
+    a.className = 'card'; a.href = `#${page.id}`;
+    a.innerHTML = `
+      <div class="card-head">
+        <div class="row"><h2>${page.name}<span class="sym">${page.sym}</span></h2><span class="meta">${page.eq}</span></div>
+        <span class="meta">${page.meta}</span>
+      </div>
+      <canvas aria-hidden="true"></canvas>
+      <div class="card-foot"><p>${page.blurb}</p><span class="open">Open →</span></div>`;
+    a.setAttribute('aria-label', `Open ${page.name} (${page.sym})`);
+    cardsEl.appendChild(a);
+    a.addEventListener('click', e => { e.preventDefault(); openPage(page.id, a); });
+    const cam = { yaw: 0.5, pitch: 0.42, zoom: 1, ...page.cam };
+    return { page, el: a, surf: surface(a.querySelector('canvas')), cam: { ...cam }, t: 0, opts: { ...page.opts, ...page.card } };
+  });
+
+  // Detail view
+  const home = document.getElementById('home'), detail = document.getElementById('detail');
+  const big = surface(document.getElementById('big'));
+  const controlsEl = document.getElementById('controls'), proseEl = document.getElementById('prose');
+  const sideHead = document.getElementById('sideHead'), readoutEl = document.getElementById('readout');
+  const hintEl = document.getElementById('hint'), stepsEl = document.getElementById('steps');
+  let current = null;
+
+  PAGES.forEach(p => { p.t = 0; p._tumble = 0; p.home = { ...p.cam }; p.camNow = { yaw: 0, pitch: 0, ...p.cam }; });
+  stepsEl.innerHTML = PAGES.map(p => `<a class="btn" href="#${p.id}" data-id="${p.id}">${p.sym} ${p.name}</a>`).join('');
+
+  function buildDetail(page) {
+    sideHead.innerHTML = `<span class="label">${page.meta.replace(/<[^>]+>/g, '')}</span><h2>${page.name}<span class="sym">${page.sym}</span></h2><span class="eq">${page.eq}</span>`;
+    controlsEl.innerHTML = '';
+    const toggles = document.createElement('div'); toggles.className = 'toggles';
+    for (const c of page.controls) {
+      const id = `ctl-${page.id}-${c.key}`;
+      if (c.type === 'range') {
+        const f = document.createElement('div'); f.className = 'field';
+        f.innerHTML = `<div class="top"><label class="label" for="${id}">${c.label}</label><output for="${id}"></output></div>
+          <input id="${id}" type="range" min="${c.min}" max="${c.max}" step="${c.step}" value="${page.opts[c.key]}">`;
+        const input = f.querySelector('input'), out = f.querySelector('output');
+        const sync = () => { out.textContent = c.fmt(+input.value); };
+        input.addEventListener('input', () => {
+          page.opts[c.key] = +input.value; sync();
+          if (c.key === 'v') { page.opts.sweep = false; const b = document.getElementById(`ctl-${page.id}-sweep`); if (b) b.setAttribute('aria-pressed', 'false'); }
+        });
+        sync();
+        c.el = input; c.sync = sync;
+        controlsEl.appendChild(f);
+      } else {
+        const b = document.createElement('button');
+        b.type = 'button'; b.id = id; b.textContent = c.label;
+        b.setAttribute('aria-pressed', String(!!page.opts[c.key]));
+        b.addEventListener('click', () => { page.opts[c.key] = !page.opts[c.key]; b.setAttribute('aria-pressed', String(page.opts[c.key])); });
+        toggles.appendChild(b);
+      }
+    }
+    if (toggles.children.length) controlsEl.appendChild(toggles);
+    proseEl.innerHTML = page.prose;
+    hintEl.textContent = page.hint;
+    big.el.classList.toggle('flat', !!page.flat);
+    stepsEl.querySelectorAll('a').forEach(a => {
+      if (a.dataset.id === page.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    readoutEl.innerHTML = '';
+    readoutEl.hidden = true;
+  }
+
+  let pendingFrom = null;
+  function openPage(id, fromEl) { pendingFrom = fromEl ? fromEl.getBoundingClientRect() : null; if (location.hash === `#${id}`) route(); else location.hash = id; }
+
+  function route() {
+    const id = location.hash.replace('#', '');
+    const page = PAGES.find(p => p.id === id);
+    if (!page) {
+      current = null; detail.hidden = true; home.hidden = false;
+      document.title = 'Sphere Ladder';
+      return;
+    }
+    current = page;
+    buildDetail(page);
+    home.hidden = true; detail.hidden = false;
+    window.scrollTo(0, 0);
+    if (pendingFrom && !reduceMotion && detail.animate) {
+      const r0 = pendingFrom, vp = detail.querySelector('.viewport'), r1 = vp.getBoundingClientRect();
+      vp.animate([
+        { transformOrigin: '0 0', transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px) scale(${r0.width / r1.width}, ${r0.height / r1.height})` },
+        { transformOrigin: '0 0', transform: 'none' },
+      ], { duration: 480, easing: 'cubic-bezier(.2,.75,.2,1)' });
+      detail.querySelector('.side').animate([{ opacity: 0, transform: 'translateX(24px)' }, { opacity: 1, transform: 'none' }], { duration: 480, delay: 120, easing: 'ease-out', fill: 'backwards' });
+    }
+    pendingFrom = null;
+  }
+  window.addEventListener('hashchange', route);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && current) location.hash = ''; });
+
+  // Camera interaction on the big canvas
+  let drag = null;
+  big.el.addEventListener('pointerdown', e => {
+    if (!current || current.flat) return;
+    drag = { x: e.clientX, y: e.clientY, yaw: current.camNow.yaw, pitch: current.camNow.pitch };
+    big.el.setPointerCapture(e.pointerId);
+  });
+  big.el.addEventListener('pointermove', e => {
+    if (!drag || !current) return;
+    current.camNow.yaw = drag.yaw + (e.clientX - drag.x) * 0.007;
+    current.camNow.pitch = clamp(drag.pitch + (e.clientY - drag.y) * 0.007, -1.5, 1.5);
+  });
+  const endDrag = () => { drag = null; };
+  big.el.addEventListener('pointerup', endDrag);
+  big.el.addEventListener('pointercancel', endDrag);
+  big.el.addEventListener('wheel', e => {
+    if (!current) return;
+    e.preventDefault();
+    current.camNow.zoom = clamp(current.camNow.zoom * Math.exp(-e.deltaY * 0.001), 0.35, 4);
+  }, { passive: false });
+  big.el.addEventListener('dblclick', () => { if (current) Object.assign(current.camNow, current.home); });
+
+  // ═══════════ Loop ═══════════
+  let last = performance.now(), lastReadout = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    const spin = reduceMotion ? 0 : 0.06;
+
+    if (!current) {
+      for (const c of cards) {
+        c.t += dt * 0.5;
+        if (!c.page.flat) c.cam.yaw += dt * spin;
+        const o = c.opts;
+        if (c.page.id === 's4') o.v = Math.sin(c.t * 0.7) * 1.0;
+        paint(c.surf, c.page, sceneOpts(c.page, o, false, c.t), c.t, c.cam);
+      }
+    } else {
+      const p = current, o = p.opts;
+      p.t += dt * o.speed;
+      if (!p.flat && !drag) p.camNow.yaw += dt * spin;
+      if (o.tumble) p._tumble += dt * 0.15;
+      if (p.id === 's4' && o.sweep) {
+        p._sweep = (p._sweep ?? Math.asin(clamp(o.v, -1, 1))) + dt * o.sweepSpeed;
+        o.v = Math.sin(p._sweep);
+        const c = p.controls.find(c => c.key === 'v');
+        if (c && c.el) { c.el.value = o.v; c.sync(); }
+      } else if (p.id === 's4') p._sweep = undefined;
+      const info = paint(big, p, sceneOpts(p, o, true, p.t), p.t, p.camNow);
+      if (now - lastReadout > 100 && info) {
+        lastReadout = now;
+        readoutEl.innerHTML = p.readout(info).map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
+        readoutEl.hidden = !readoutEl.innerHTML;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  // ═══════════ Theme ═══════════
+  const root = document.documentElement;
+  const THEME_KEY = 'sphere-ladder-theme';
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const themeBtns = [...document.querySelectorAll('.theme-btn')];
+  let hostTheme = root.getAttribute('data-theme'); // the viewer may stamp its own choice
+  let ownValue = hostTheme;
+  let mode = 'system';
+  try { mode = localStorage.getItem(THEME_KEY) || 'system'; } catch (e) { /* storage unavailable */ }
+
+  function resolveTheme() {
+    const want = mode === 'system' ? hostTheme : mode;
+    if (want) root.setAttribute('data-theme', want); else root.removeAttribute('data-theme');
+    ownValue = want;
+    const light = want ? want === 'light' : !darkQuery.matches;
+    applyCanvasTheme(light);
+    PAGES.forEach(p => { p._fkey = null; }); // fiber colours depend on the theme
+    const name = { system: 'System', light: 'Light', dark: 'Dark' }[mode];
+    themeBtns.forEach(b => {
+      b.textContent = `Theme: ${name}`;
+      b.setAttribute('aria-label', `Colour theme: ${name}. Click to change.`);
+    });
+  }
+  themeBtns.forEach(b => b.addEventListener('click', () => {
+    mode = { system: 'light', light: 'dark', dark: 'system' }[mode] || 'system';
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* storage unavailable */ }
+    resolveTheme();
+  }));
+  darkQuery.addEventListener('change', resolveTheme);
+  // If the viewer switches theme itself, follow it
+  new MutationObserver(() => {
+    const now = root.getAttribute('data-theme');
+    if (now === ownValue) return;
+    hostTheme = now; mode = 'system';
+    try { localStorage.setItem(THEME_KEY, mode); } catch (e) { /* storage unavailable */ }
+    resolveTheme();
+  }).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+
+  resolveTheme();
+  route();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
