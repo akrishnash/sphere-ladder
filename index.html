@@ -102,6 +102,14 @@
     display: grid; grid-template-columns: auto auto; gap: 0 14px;
   }
   .readout span:nth-child(odd) { color: var(--muted); }
+  .pick-frame {
+    position: absolute; border: 1px solid var(--line-strong); border-radius: 8px;
+    cursor: crosshair; touch-action: none;
+  }
+  .pick-frame span {
+    position: absolute; left: 0; right: 0; bottom: -18px; text-align: center;
+    font-size: 10px; color: var(--muted); pointer-events: none; white-space: nowrap;
+  }
   .hint { position: absolute; right: 12px; bottom: 10px; color: var(--muted); font-size: 11px; pointer-events: none; }
   .side { display: flex; flex-direction: column; gap: 14px; max-height: clamp(380px, 78vh, 820px); overflow-y: auto; padding-right: 4px; }
   .side-head { display: flex; flex-direction: column; gap: 3px; }
@@ -146,7 +154,7 @@
     <p><b>The shadow is flat space plus one missing point.</b> A line, a plane, ordinary space: N is the one point with no shadow, and it goes to infinity.</p>
     <p><b>Odd spheres can flow everywhere; even ones can't.</b> S¹ and S³ carry flows with no still point. S² and S⁴ always have one, like the poles of a spinning globe.</p>
   </section>
-  <p class="note">A <a href="https://github.com/akrishnash/sphere-ladder" style="color:var(--accent)">Python companion</a> (<span class="f">python -m sphere_ladder verify</span>) checks the claims on these pages numerically with NumPy. · <a href="https://akrishnash.github.io/" style="color:var(--accent)">akrishnash.github.io</a></p>
+  <p class="note">A <a href="https://github.com/akrishnash/sphere-ladder" style="color:var(--accent)">Python companion</a> (<span class="f">python -m sphere_ladder verify</span>) checks the claims on these pages numerically with NumPy. · <a href="https://github.com/akrishnash/sphere-ladder/blob/main/RESEARCH.md" style="color:var(--accent)">Research plan</a> · <a href="https://akrishnash.github.io/" style="color:var(--accent)">akrishnash.github.io</a></p>
 </div>
 
 <div id="detail" class="wrap" hidden>
@@ -160,6 +168,8 @@
   <div class="stage">
     <div class="viewport">
       <canvas id="big"></canvas>
+      <canvas id="gl" hidden></canvas>
+      <div class="pick-frame" id="pickFrame" hidden aria-label="Small sphere S²: click or drag to pick Hopf rings"><span>S² · click or drag to pick rings</span></div>
       <div class="readout" id="readout"></div>
       <span class="hint" id="hint"></span>
     </div>
@@ -171,6 +181,14 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 (() => {
   // ═══════════ Math & drawing primitives ═══════════
@@ -667,11 +685,17 @@
         { type: 'range', key: 'per', label: 'Rings per torus', min: 3, max: 24, step: 1, fmt: v => v },
         { type: 'toggle', key: 'paths', label: 'Rings' },
         { type: 'toggle', key: 'particles', label: 'Particles' },
-        { type: 'toggle', key: 'inset', label: 'S² map' },
+        { type: 'toggle', key: 'inset', label: 'S² picker' },
         { type: 'toggle', key: 'tumble', label: '4D tumble' },
+        { type: 'button', label: 'Clear picked rings', action: () => GL && GL.clearPicks() },
       ],
       scene: sceneS3,
-      readout: () => { const o = PAGES[3].opts; return [['rings', String(o.tori * o.per)], ['linked pairs', String((o.tori * o.per) * (o.tori * o.per - 1) / 2)], ['linking no.', '1 for every pair']]; },
+      readout: i => {
+        const o = PAGES[3].opts, n = i.rings ?? o.tori * o.per;
+        const rows = [['rings', String(n)], ['linked pairs', String(n * (n - 1) / 2)], ['linking no.', '1 for every pair']];
+        if (i.picked !== undefined) rows.splice(1, 0, ['picked', String(i.picked)]);
+        return rows;
+      },
       hint: 'Drag to turn · scroll to zoom · double-click to reset',
       prose: `
         <section><h3>Two complex numbers</h3><p>S³ is every pair <span class="f">(z₁, z₂)</span> with <span class="f">|z₁|² + |z₂|² = 1</span>. That's four real coordinates with <span class="f">x² + y² + z² + w² = 1</span>: a 3-dimensional space curled up inside ℝ⁴, the way S² is a surface curled up inside ℝ³.</p></section>
@@ -679,6 +703,7 @@
         <section><h3>Tori and rings</h3><p>Each colour shade sits on one torus from the torus page. Each ring is a <span class="f">(1, 1)</span> curve on its torus. It goes once around the hole and once around the tube, which is why the rings lean.</p></section>
         <section><h3>Every pair is linked</h3><p>Pick any two rings: they're linked exactly once, like two links of a chain. The Python checker measures this with <b>Gauss's linking integral</b> and gets 1.000 for every pair it tries.</p></section>
         <section><h3>One ring, one point</h3><p>The Hopf map <span class="f">h(z₁, z₂) = (2z₁z̄₂, |z₁|² − |z₂|²)</span> sends <b>each whole ring to a single point of S²</b>, shown top-right in matching colours. Rings on the same torus land on the same latitude. While the particles race round, those dots never move.</p></section>
+        <section><h3>Pick your own rings</h3><p>Run it backwards: <b>click a point on the small sphere</b> and the one ring lying over it appears in S³. <b>Drag a path</b> and a whole family of rings sweeps out. Trace any circle on S² and its rings form a torus; trace a latitude and it's exactly one of the nested tori. The other rings fade back so your picks stand out.</p></section>
         <section><h3>4D tumble</h3><p>Rotating in ℝ⁴ pushes rings through the pole N. Their shadows swell, pass through infinity (a straight line for an instant) and come back. It's the pink line from the S² page, one dimension up.</p></section>`,
     },
     {
@@ -793,6 +818,13 @@
     const toggles = document.createElement('div'); toggles.className = 'toggles';
     for (const c of page.controls) {
       const id = `ctl-${page.id}-${c.key}`;
+      if (c.type === 'button') {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = c.label;
+        b.addEventListener('click', c.action);
+        toggles.appendChild(b);
+        continue;
+      }
       if (c.type === 'range') {
         const f = document.createElement('div'); f.className = 'field';
         f.innerHTML = `<div class="top"><label class="label" for="${id}">${c.label}</label><output for="${id}"></output></div>
@@ -834,10 +866,12 @@
     if (!page) {
       current = null; detail.hidden = true; home.hidden = false;
       document.title = 'Sphere Ladder';
+      setGL(false);
       return;
     }
     current = page;
     buildDetail(page);
+    setGL(page.id === 's3');
     home.hidden = true; detail.hidden = false;
     window.scrollTo(0, 0);
     if (pendingFrom && !reduceMotion && detail.animate) {
@@ -875,6 +909,331 @@
   }, { passive: false });
   big.el.addEventListener('dblclick', () => { if (current) Object.assign(current.camNow, current.home); });
 
+  // ═══════════ WebGL view of S³ (three.js) ═══════════
+  // Rings are lit tubes. Each ring's shadow is an exact circle, so we find its centre, radius and plane
+  // from three points and sweep the tube analytically: smooth even for rings passing near the pole.
+  const glCanvas = document.getElementById('gl'), pickFrame = document.getElementById('pickFrame');
+  const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  function shadowCircle(eta, phi, a) {
+    let best = 0, bestD = -Infinity;
+    for (let i = 0; i < 24; i++) {
+      const d = 1 - rotate4(hopfPt(eta, phi, (i / 24) * TAU), a)[3];
+      if (d > bestD) { bestD = d; best = (i / 24) * TAU; }
+    }
+    const P = t => { const q = rotate4(hopfPt(eta, phi, t), a), d = 1 - q[3]; return [q[0] / d, q[2] / d, q[1] / d]; };
+    const A = P(best), B = P(best + TAU / 3), C = P(best - TAU / 3);
+    const ab = sub3(B, A), ac = sub3(C, A), n = cross(ab, ac), n2 = dot3(n, n);
+    if (!(n2 > 1e-12)) return null;
+    const t1 = cross(n, ab), t2 = cross(ac, n), aa = dot3(ac, ac), bb = dot3(ab, ab);
+    const cen = [0, 1, 2].map(i => A[i] + (aa * t1[i] + bb * t2[i]) / (2 * n2));
+    const R = Math.hypot(...sub3(A, cen));
+    if (!(R < 40)) return null; // passes (almost) through the pole: a near-infinite ring
+    const u = norm(sub3(A, cen)), nn = norm(n);
+    return { cen, R, u, v: cross(nn, u), n: nn };
+  }
+
+  const GL = (() => {
+    try {
+      const T = window.THREE;
+      if (!T || !T.WebGLRenderer) return null;
+      const renderer = new T.WebGLRenderer({ canvas: glCanvas, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      const scene = new T.Scene();
+      const camera = new T.PerspectiveCamera(38, 1, 0.05, 500);
+      camera.position.set(4.8, 3.4, 7.4);
+      const controls = T.OrbitControls ? new T.OrbitControls(camera, glCanvas) : null;
+      if (controls) {
+        controls.enableDamping = true; controls.dampingFactor = 0.08;
+        controls.minDistance = 1.2; controls.maxDistance = 80; controls.autoRotateSpeed = 0.45;
+        controls.saveState();
+        glCanvas.addEventListener('dblclick', () => controls.reset());
+      } else camera.lookAt(0, 0, 0);
+      scene.add(new T.HemisphereLight(0xffffff, 0x2a2e48, 0.85));
+      const keyLight = new T.DirectionalLight(0xffffff, 0.95); keyLight.position.set(5, 9, 6); scene.add(keyLight);
+      const rimLight = new T.DirectionalLight(0x9fbfff, 0.45); rimLight.position.set(-6, -3, -5); scene.add(rimLight);
+
+      let composer = null, bloom = null;
+      if (T.EffectComposer && T.RenderPass && T.UnrealBloomPass) {
+        composer = new T.EffectComposer(renderer);
+        composer.addPass(new T.RenderPass(scene, camera));
+        bloom = new T.UnrealBloomPass(new T.Vector2(512, 512), 0.75, 0.5, 0.5);
+        composer.addPass(bloom);
+      }
+
+      // Tube geometry shared layout
+      const SEG = 180, RAD = 10;
+      const COS_S = [], SIN_S = [], COS_R = [], SIN_R = [];
+      for (let i = 0; i < SEG; i++) { COS_S.push(Math.cos((i / SEG) * TAU)); SIN_S.push(Math.sin((i / SEG) * TAU)); }
+      for (let j = 0; j < RAD; j++) { COS_R.push(Math.cos((j / RAD) * TAU)); SIN_R.push(Math.sin((j / RAD) * TAU)); }
+      const tubeIndex = [];
+      for (let i = 0; i < SEG; i++) for (let j = 0; j < RAD; j++) {
+        const a = i * RAD + j, b = ((i + 1) % SEG) * RAD + j, c = ((i + 1) % SEG) * RAD + (j + 1) % RAD, d = i * RAD + (j + 1) % RAD;
+        tubeIndex.push(a, b, d, b, c, d);
+      }
+      function tubeGeometry() {
+        const g = new T.BufferGeometry();
+        g.setAttribute('position', new T.BufferAttribute(new Float32Array(SEG * RAD * 3), 3).setUsage(T.DynamicDrawUsage));
+        g.setAttribute('normal', new T.BufferAttribute(new Float32Array(SEG * RAD * 3), 3).setUsage(T.DynamicDrawUsage));
+        g.setIndex(tubeIndex);
+        return g;
+      }
+      function fillTube(geo, c, r) {
+        const pos = geo.attributes.position.array, nrm = geo.attributes.normal.array;
+        let k = 0;
+        for (let i = 0; i < SEG; i++) {
+          const rx = c.u[0] * COS_S[i] + c.v[0] * SIN_S[i], ry = c.u[1] * COS_S[i] + c.v[1] * SIN_S[i], rz = c.u[2] * COS_S[i] + c.v[2] * SIN_S[i];
+          const px = c.cen[0] + c.R * rx, py = c.cen[1] + c.R * ry, pz = c.cen[2] + c.R * rz;
+          for (let j = 0; j < RAD; j++) {
+            const dx = rx * COS_R[j] + c.n[0] * SIN_R[j], dy = ry * COS_R[j] + c.n[1] * SIN_R[j], dz = rz * COS_R[j] + c.n[2] * SIN_R[j];
+            pos[k] = px + r * dx; pos[k + 1] = py + r * dy; pos[k + 2] = pz + r * dz;
+            nrm[k] = dx; nrm[k + 1] = dy; nrm[k + 2] = dz;
+            k += 3;
+          }
+        }
+        geo.attributes.position.needsUpdate = true;
+        geo.attributes.normal.needsUpdate = true;
+      }
+
+      const ringGroup = new T.Group(); scene.add(ringGroup);
+      let rings = [], defaultsKey = '', dirty = true, lastA = NaN, lastFade = -1;
+      function makeRing(eta, phi, picked) {
+        const geo = tubeGeometry();
+        const mat = new T.MeshStandardMaterial({ roughness: 0.36, metalness: 0.05 });
+        const mesh = new T.Mesh(geo, mat);
+        mesh.frustumCulled = false;
+        ringGroup.add(mesh);
+        const r = { eta, phi, picked, geo, mat, mesh, phase: picked ? Math.random() * TAU : 0, rgb: [0, 0, 0] };
+        colorRing(r);
+        return r;
+      }
+      function colorRing(r) {
+        r.rgb = hopfColor(r.eta, r.phi);
+        const [cr, cg, cb] = r.rgb.map(x => x / 255);
+        r.mat.color.setRGB(cr, cg, cb);
+        const e = LIGHT ? (r.picked ? 0.12 : 0) : (r.picked ? 0.5 : 0.16);
+        r.mat.emissive.setRGB(cr * e, cg * e, cb * e);
+      }
+      function dropRing(r) { ringGroup.remove(r.mesh); r.geo.dispose(); r.mat.dispose(); }
+
+      // Particles: a short fading trail of glowing beads per ring
+      const TRAIL = 10;
+      const sprite = (() => {
+        const c = document.createElement('canvas'); c.width = c.height = 64;
+        const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+        g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+        x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+        return new T.CanvasTexture(c);
+      })();
+      const pMat = new T.PointsMaterial({ size: 0.17, map: sprite, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending });
+      let pGeo = null, points = null;
+      function buildParticles() {
+        if (points) { scene.remove(points); pGeo.dispose(); }
+        const n = rings.length * TRAIL;
+        pGeo = new T.BufferGeometry();
+        pGeo.setAttribute('position', new T.BufferAttribute(new Float32Array(n * 3), 3).setUsage(T.DynamicDrawUsage));
+        pGeo.setAttribute('color', new T.BufferAttribute(new Float32Array(n * 3), 3).setUsage(T.DynamicDrawUsage));
+        points = new T.Points(pGeo, pMat);
+        points.frustumCulled = false;
+        scene.add(points);
+      }
+
+      // S² picker: its own little scene, drawn into a corner with a scissor rectangle
+      const scene2 = new T.Scene(), cam2 = new T.PerspectiveCamera(30, 1, 0.1, 20);
+      scene2.add(new T.HemisphereLight(0xffffff, 0x404060, 1.0));
+      const k2 = new T.DirectionalLight(0xffffff, 0.5); k2.position.set(3, 5, 4); scene2.add(k2);
+      const globeMat = new T.MeshStandardMaterial({ color: 0x8a92b4, roughness: 0.9, transparent: true, opacity: 0.2 });
+      const globe = new T.Mesh(new T.SphereGeometry(1, 48, 32), globeMat);
+      scene2.add(globe);
+      const gridPts = [];
+      const pushCircle = f => { for (let i = 0; i < 64; i++) { gridPts.push(...f((i / 64) * TAU), ...f(((i + 1) / 64) * TAU)); } };
+      for (const y of [-0.6, 0, 0.6]) { const r = Math.sqrt(1 - y * y) * 1.002; pushCircle(a => [r * Math.cos(a), y, r * Math.sin(a)]); }
+      for (let m = 0; m < 6; m++) { const a = (m / 6) * Math.PI; pushCircle(t => [1.002 * Math.sin(t) * Math.cos(a), 1.002 * Math.cos(t), 1.002 * Math.sin(t) * Math.sin(a)]); }
+      const gridGeo = new T.BufferGeometry(); gridGeo.setAttribute('position', new T.Float32BufferAttribute(gridPts, 3));
+      const gridMat = new T.LineBasicMaterial({ transparent: true, opacity: 0.35 });
+      scene2.add(new T.LineSegments(gridGeo, gridMat));
+      const dotMat = new T.PointsMaterial({ size: 0.1, map: sprite, vertexColors: true, transparent: true, depthWrite: false });
+      const pickMat = new T.PointsMaterial({ size: 0.2, map: sprite, vertexColors: true, transparent: true, depthWrite: false });
+      let dots = null, pickDots = null;
+      function buildDots() {
+        for (const d of [dots, pickDots]) if (d) { scene2.remove(d); d.geometry.dispose(); }
+        const mk = (list, mat) => {
+          const pos = [], col = [];
+          for (const r of list) {
+            const b = hopfMap(hopfPt(r.eta, r.phi, 0));
+            pos.push(b[0] * 1.01, b[1] * 1.01, b[2] * 1.01); col.push(...r.rgb.map(x => x / 255));
+          }
+          const g = new T.BufferGeometry();
+          g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+          g.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+          const p = new T.Points(g, mat); p.frustumCulled = false; scene2.add(p); return p;
+        };
+        dots = mk(rings.filter(r => !r.picked), dotMat);
+        pickDots = mk(rings.filter(r => r.picked), pickMat);
+      }
+
+      // Picking: click or drag on the small sphere
+      const ray = new T.Raycaster(), ndc = new T.Vector2();
+      let painting = false, lastPick = null;
+      const MAX_PICKS = 90;
+      function pickAt(e) {
+        const r = pickFrame.getBoundingClientRect();
+        ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+        cam2.updateMatrixWorld();
+        ray.setFromCamera(ndc, cam2);
+        const hit = ray.intersectObject(globe)[0];
+        if (!hit) return;
+        const b = hit.point.clone().normalize();
+        if (lastPick && b.angleTo(lastPick) < 0.09) return;
+        lastPick = b;
+        const eta = 0.5 * Math.acos(clamp(b.y, -1, 1)), phi = Math.atan2(-b.z, b.x);
+        rings.push(makeRing(eta, phi, true));
+        const picked = rings.filter(x => x.picked);
+        if (picked.length > MAX_PICKS) { dropRing(picked[0]); rings.splice(rings.indexOf(picked[0]), 1); }
+        dirty = true; buildParticles(); buildDots();
+      }
+      pickFrame.addEventListener('pointerdown', e => { painting = true; lastPick = null; pickFrame.setPointerCapture(e.pointerId); pickAt(e); e.preventDefault(); });
+      pickFrame.addEventListener('pointermove', e => { if (painting) pickAt(e); });
+      const stopPaint = () => { painting = false; };
+      pickFrame.addEventListener('pointerup', stopPaint);
+      pickFrame.addEventListener('pointercancel', stopPaint);
+
+      // Sizing
+      let W = 0, H = 0;
+      new ResizeObserver(() => {
+        W = glCanvas.clientWidth; H = glCanvas.clientHeight;
+        if (!W || !H) return;
+        renderer.setSize(W, H, false);
+        camera.aspect = W / H; camera.updateProjectionMatrix();
+        if (composer) composer.setSize(W, H);
+      }).observe(glCanvas);
+
+      let bgColor = new T.Color(BG), insetColor = new T.Color(0x0a0c13);
+
+      return {
+        show(on) {
+          glCanvas.hidden = !on;
+          if (!on) pickFrame.hidden = true;
+        },
+        setTheme(light) {
+          bgColor = new T.Color(BG);
+          scene.background = bgColor;
+          scene.fog = new T.Fog(bgColor, 14, 60);
+          insetColor = new T.Color(light ? 0xf3f4f8 : 0x0a0c13);
+          pMat.blending = light ? T.NormalBlending : T.AdditiveBlending;
+          pMat.needsUpdate = true;
+          globeMat.color.set(light ? 0xc9cee0 : 0x8a92b4);
+          gridMat.color.set(light ? 0x5d6479 : 0xc8cde0);
+          for (const r of rings) colorRing(r);
+          if (rings.length) buildDots();
+        },
+        clearPicks() {
+          for (const r of rings.filter(x => x.picked)) dropRing(r);
+          rings = rings.filter(x => !x.picked);
+          dirty = true; buildParticles(); buildDots();
+        },
+        render(o, t, tumble, spin) {
+          if (!W || !H) return {};
+          // Rebuild the default rings when the tori / rings-per-torus settings change
+          const key = `${o.tori}:${o.per}`;
+          if (key !== defaultsKey) {
+            defaultsKey = key;
+            for (const r of rings.filter(x => !x.picked)) dropRing(r);
+            const picked = rings.filter(x => x.picked);
+            rings = [];
+            etaSpread(o.tori).forEach((eta, ti) => {
+              for (let k = 0; k < o.per; k++) {
+                const r = makeRing(eta, (k / o.per) * TAU + ti * 0.37, false);
+                r.phase = k * 2.399963 + ti;
+                rings.push(r);
+              }
+            });
+            rings.push(...picked);
+            dirty = true; buildParticles(); buildDots();
+          }
+          const a = o.tumble ? tumble : 0;
+          if (dirty || a !== lastA) {
+            for (const r of rings) {
+              const c = shadowCircle(r.eta, r.phi, a);
+              r.hidden = !c;
+              if (c) fillTube(r.geo, c, r.picked ? 0.05 : 0.026);
+            }
+            lastA = a; dirty = false;
+          }
+          // Picked rings take the stage; the default family fades back
+          const nPicked = rings.reduce((s, r) => s + (r.picked ? 1 : 0), 0);
+          const fade = nPicked ? 0.16 : 1;
+          if (fade !== lastFade) {
+            for (const r of rings) if (!r.picked) { r.mat.transparent = fade < 1; r.mat.opacity = fade; r.mat.depthWrite = fade === 1; r.mat.needsUpdate = true; }
+            lastFade = fade;
+          }
+          for (const r of rings) r.mesh.visible = !r.hidden && (r.picked || o.paths);
+
+          // Particles
+          points.visible = o.particles !== false;
+          if (points.visible) {
+            const pos = pGeo.attributes.position.array, col = pGeo.attributes.color.array;
+            const bg = [bgColor.r, bgColor.g, bgColor.b];
+            let k = 0;
+            for (const r of rings) {
+              const show = !r.hidden && (r.picked || o.paths || nPicked === 0);
+              const dim = r.picked || !nPicked ? 1 : 0.25;
+              for (let s = 0; s < TRAIL; s++) {
+                const q = rotate4(hopfPt(r.eta, r.phi, t + r.phase - s * 0.06), a), d = 1 - q[3];
+                const ok = show && d > 0.03;
+                pos[k] = ok ? q[0] / d : 1e5; pos[k + 1] = ok ? q[2] / d : 1e5; pos[k + 2] = ok ? q[1] / d : 1e5;
+                const f = Math.pow(1 - s / TRAIL, 1.6) * dim;
+                for (let ch = 0; ch < 3; ch++) {
+                  const c = r.rgb[ch] / 255;
+                  col[k + ch] = LIGHT ? bg[ch] + (c - bg[ch]) * f : Math.min(1, (0.35 + c) * f);
+                }
+                k += 3;
+              }
+            }
+            pGeo.attributes.position.needsUpdate = true;
+            pGeo.attributes.color.needsUpdate = true;
+          }
+
+          if (controls) { controls.autoRotate = spin && !painting; controls.update(); }
+          if (composer && !LIGHT) composer.render(); else renderer.render(scene, camera);
+
+          // S² picker in the top-right corner
+          pickFrame.hidden = !o.inset;
+          if (o.inset) {
+            const S = Math.round(clamp(W * 0.24, 130, 220)), m = 14, left = W - S - m;
+            pickFrame.style.left = `${left}px`; pickFrame.style.top = `${m}px`;
+            pickFrame.style.width = `${S}px`; pickFrame.style.height = `${S}px`;
+            cam2.position.copy(camera.position).normalize().multiplyScalar(4.3);
+            cam2.lookAt(0, 0, 0);
+            renderer.autoClear = false;
+            renderer.setScissorTest(true);
+            renderer.setViewport(left, H - m - S, S, S);
+            renderer.setScissor(left, H - m - S, S, S);
+            renderer.setClearColor(insetColor, 1);
+            renderer.clear();
+            renderer.render(scene2, cam2);
+            renderer.setScissorTest(false);
+            renderer.setViewport(0, 0, W, H);
+            renderer.autoClear = true;
+          }
+          return { rings: rings.length, picked: nPicked };
+        },
+      };
+    } catch (err) {
+      console.warn('WebGL view unavailable, using the 2D view', err);
+      return null;
+    }
+  })();
+
+  let useGL = false, glBroken = false;
+  function setGL(on) {
+    useGL = !!(on && GL && !glBroken);
+    big.el.hidden = useGL;
+    if (GL) GL.show(useGL);
+    if (useGL) hintEl.textContent = 'Drag to orbit · scroll to zoom · click or drag the small sphere to pick rings';
+  }
+
   // ═══════════ Loop ═══════════
   let last = performance.now(), lastReadout = 0;
   function frame(now) {
@@ -901,7 +1260,12 @@
         const c = p.controls.find(c => c.key === 'v');
         if (c && c.el) { c.el.value = o.v; c.sync(); }
       } else if (p.id === 's4') p._sweep = undefined;
-      const info = paint(big, p, sceneOpts(p, o, true, p.t), p.t, p.camNow);
+      let info = null;
+      if (useGL) {
+        try { info = GL.render(sceneOpts(p, o, true, p.t), p.t, p._tumble, spin > 0); }
+        catch (err) { console.warn('WebGL view failed, falling back to 2D', err); glBroken = true; setGL(false); }
+      }
+      if (!useGL) info = paint(big, p, sceneOpts(p, o, true, p.t), p.t, p.camNow);
       if (now - lastReadout > 100 && info) {
         lastReadout = now;
         readoutEl.innerHTML = p.readout(info).map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
@@ -926,6 +1290,7 @@
     ownValue = want;
     const light = want ? want === 'light' : !darkQuery.matches;
     applyCanvasTheme(light);
+    if (GL) { try { GL.setTheme(light); } catch (err) { console.warn(err); } }
     PAGES.forEach(p => { p._fkey = null; }); // fiber colours depend on the theme
     const name = { system: 'System', light: 'Light', dark: 'Dark' }[mode];
     themeBtns.forEach(b => {
@@ -953,5 +1318,6 @@
   requestAnimationFrame(frame);
 })();
 </script>
+
 </body>
 </html>

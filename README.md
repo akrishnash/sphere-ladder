@@ -15,7 +15,16 @@ by slicing it into a stack of 3-spheres.
 | **S³** hypersphere | The Hopf fibration: great circles become linked rings on nested tori, each ring one point of S². |
 | **S⁴** 4-sphere | Slices x₅ = v are 3-spheres of radius √(1 − v²), shrinking to two still points. |
 
-The web app is a single static `index.html` (no build step). Light and dark themes.
+The web app is a single static `index.html` (no build step), with light and dark themes. The S³ page renders
+in WebGL (three.js): lit tubes, bloom, and an **S² picker**. Click a point on the small sphere and the Hopf
+ring over it appears; drag a path and a whole family of rings sweeps out. If WebGL is unavailable it
+falls back to the 2D canvas.
+
+## Research
+
+This is growing into a research project on seeing S³, with qubit (Bloch sphere) and spacecraft-attitude
+(quaternion) modes. See **[RESEARCH.md](RESEARCH.md)** for the questions, milestones and venues, and the
+[issues](https://github.com/akrishnash/sphere-ladder/issues) for the work items.
 
 ## Python companion
 
